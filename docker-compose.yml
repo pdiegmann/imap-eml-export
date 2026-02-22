@@ -1,0 +1,21 @@
+# Docker Compose setup for a local IMAP test server.
+#
+# Spins up a Dovecot server pre-loaded with sample emails in multiple folders
+# so you can run imap-eml-export against it and verify the output.
+#
+# Usage:
+#   docker compose up -d          # start the server
+#   docker compose down           # stop the server
+#   docker compose down -v        # stop and wipe mail volume
+
+services:
+  imap:
+    build:
+      context: dev/imap
+    ports:
+      - "143:143"   # plain IMAP  — use with tls=false in config.test.toml
+      - "993:993"   # IMAPS       — self-signed cert, for TLS testing
+    environment:
+      MAIL_USER: testuser
+      MAIL_PASS: testpassword
+    restart: unless-stopped

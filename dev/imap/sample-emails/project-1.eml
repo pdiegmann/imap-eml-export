@@ -1,0 +1,22 @@
+From: client@projecta.example.com
+To: testuser@example.com
+Subject: Project A - Initial Requirements
+Date: Mon, 22 Jan 2024 09:00:00 +0000
+Message-ID: <project-001@projecta.example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hi,
+
+Please find below the initial requirements for Project A:
+
+1. User authentication with OAuth2
+2. REST API with JSON responses
+3. Dashboard with real-time metrics
+4. Export functionality (CSV, PDF)
+
+We would like to schedule a kickoff call next week.
+
+Best regards,
+Client Team
+Project A
