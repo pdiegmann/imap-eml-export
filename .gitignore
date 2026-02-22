@@ -1,0 +1,13 @@
+# Binaries
+/imap-eml-export
+*.exe
+dist/
+
+# Go
+vendor/
+
+# Output
+output/
+
+# Config (with secrets)
+config.toml
