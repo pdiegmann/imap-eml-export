@@ -84,7 +84,9 @@ func (m wizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.inputs[m.step], cmd = m.inputs[m.step].Update(msg)
+	if int(m.step) < len(m.inputs) {
+		m.inputs[m.step], cmd = m.inputs[m.step].Update(msg)
+	}
 	return m, cmd
 }
 

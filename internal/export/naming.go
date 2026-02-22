@@ -53,16 +53,19 @@ func IsWindowsReserved(name string) bool {
 }
 
 // DeduplicateFilename returns a unique filename in dir by appending _N if needed.
+// It stops after 10000 attempts to prevent infinite loops.
 func DeduplicateFilename(dir, base string) string {
 	candidate := base
 	ext := filepath.Ext(base)
 	stem := strings.TrimSuffix(base, ext)
 
-	for i := 1; ; i++ {
+	for i := 1; i <= 10000; i++ {
 		full := filepath.Join(dir, candidate)
 		if _, err := os.Stat(full); os.IsNotExist(err) {
 			return candidate
 		}
 		candidate = fmt.Sprintf("%s_%d%s", stem, i, ext)
 	}
+	// Fallback: return with a large unique suffix
+	return fmt.Sprintf("%s_dup%s", stem, ext)
 }
