@@ -134,17 +134,12 @@ func (c *Client) FetchMessages(folder string) ([]export.Message, error) {
 			msg.Date = time.Now()
 		}
 
-		// Retrieve raw body bytes
+		// Retrieve raw body bytes from the first body section.
 		for _, raw := range buf.BodySection {
 			if raw != nil {
 				msg.Raw = raw
 			}
-			break
 		}
-
-		// If body section data is nil (e.g., empty message), skip body read
-		// Try reading from the FetchItemDataBodySection literal directly
-		// (already consumed into buf.BodySection above via Collect)
 		if msg.Raw == nil {
 			msg.Raw = []byte{}
 		}
