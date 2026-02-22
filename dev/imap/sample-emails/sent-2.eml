@@ -1,0 +1,20 @@
+From: testuser@example.com
+To: charlie@example.com
+Subject: Project Update - January
+Date: Thu, 18 Jan 2024 14:00:00 +0000
+Message-ID: <sent-002@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hi Charlie,
+
+Just wanted to give you a quick update on where things stand:
+
+- Phase 1 is complete
+- Phase 2 is underway, targeting end of month
+- No blockers at the moment
+
+Let me know if you have any questions.
+
+Best,
+Test User

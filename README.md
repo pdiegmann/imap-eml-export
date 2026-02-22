@@ -150,6 +150,55 @@ bash scripts/build-local.sh v1.0.0
 
 ---
 
+## Local IMAP Test Server
+
+A Docker Compose setup is included to spin up a local Dovecot IMAP server
+pre-loaded with sample emails. This lets you run the exporter end-to-end and
+compare the output against the known input.
+
+**Requirements:** Docker with Compose plugin (or `docker-compose` v2).
+
+### Start the server
+
+```bash
+docker compose up -d
+```
+
+This builds and starts a Dovecot container with:
+
+| Port | Protocol | Notes |
+|------|----------|-------|
+| 143  | plain IMAP | use with `config.test.toml` |
+| 993  | IMAPS (TLS) | self-signed certificate |
+
+Credentials: `testuser` / `testpassword`
+
+Pre-loaded folders:
+
+| Folder | Messages |
+|--------|----------|
+| `INBOX` | 3 |
+| `Sent` | 2 |
+| `Work` | 1 |
+| `Work/ProjectA` | 1 |
+
+### Run the exporter against it
+
+```bash
+./imap-eml-export export --config config.test.toml -y
+```
+
+Exported files land in `./test-output/`. Compare them with the sample sources
+in `dev/imap/sample-emails/` to verify correctness.
+
+### Stop the server
+
+```bash
+docker compose down
+```
+
+---
+
 ## Running Tests
 
 ```bash

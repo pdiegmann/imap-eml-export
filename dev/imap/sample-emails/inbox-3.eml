@@ -1,0 +1,20 @@
+From: newsletter@example.org
+To: testuser@example.com
+Subject: Weekly Newsletter - Issue 42
+Date: Wed, 17 Jan 2024 08:00:00 +0000
+Message-ID: <inbox-003@example.org>
+MIME-Version: 1.0
+Content-Type: text/html; charset=UTF-8
+
+<html>
+<body>
+<h1>Weekly Newsletter - Issue 42</h1>
+<p>Welcome to this week's edition of our newsletter.</p>
+<ul>
+  <li>Top story: New features released</li>
+  <li>Community highlight: Open-source contributions</li>
+  <li>Tip of the week: Automate your email backups</li>
+</ul>
+<p>Thanks for reading!</p>
+</body>
+</html>

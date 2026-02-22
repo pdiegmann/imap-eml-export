@@ -1,0 +1,18 @@
+From: testuser@example.com
+To: alice@example.com
+Subject: Re: Hello World
+Date: Mon, 15 Jan 2024 11:00:00 +0000
+Message-ID: <sent-001@example.com>
+In-Reply-To: <inbox-001@example.com>
+References: <inbox-001@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hi Alice,
+
+Thanks for reaching out! Great to hear from you.
+
+Looking forward to catching up soon.
+
+Best,
+Test User

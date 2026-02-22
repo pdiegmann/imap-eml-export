@@ -11,3 +11,6 @@ output/
 
 # Config (with secrets)
 config.toml
+
+# Test output from local Docker IMAP server
+test-output/

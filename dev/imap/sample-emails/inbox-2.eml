@@ -1,0 +1,16 @@
+From: bob@example.com
+To: testuser@example.com
+Subject: Meeting Tomorrow at 10am
+Date: Tue, 16 Jan 2024 09:30:00 +0000
+Message-ID: <inbox-002@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hi,
+
+Don't forget we have a meeting tomorrow at 10am in the main conference room.
+
+Please bring the Q4 report if you have it.
+
+Cheers,
+Bob
