@@ -1,8 +1,63 @@
 # IMAP EML Export Configuration
-host = "imap.gmail.com"
-port = 993
-username = "your-email@gmail.com"
-password = "your-app-password"
+#
+# Settings are split into [export] and [import] sections so that both
+# source and target accounts can be configured in a single file.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Export settings  (used by: imap-eml-export export)
+# ──────────────────────────────────────────────────────────────────────────────
+[export]
+host       = "imap.example.com"
+port       = 993
+username   = "your-email@example.com"
+password   = "your-app-password"
 output_dir = "./output"
-tls = true
-starttls = false
+tls        = true
+starttls   = false
+
+# ── Google / Gmail / Google Workspace (GSuite) ────────────────────────────────
+# Set google = true to enable OAuth2 sign-in for Gmail or Google Workspace.
+# The host, port, and TLS settings are set automatically when google = true,
+# so you only need to supply your username.
+#
+# How to obtain OAuth2 credentials:
+#   1. Go to https://console.cloud.google.com/
+#   2. Create a project → APIs & Services → Credentials
+#   3. Create an "OAuth 2.0 Client ID" of type "Desktop app"
+#   4. Copy the Client ID and Client Secret below (or set them via the
+#      environment variables GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)
+#
+# On the first run the tool will print a short URL and a code.  Open the URL
+# in any browser, sign in with your Google account, and enter the code.
+# The refresh token is stored automatically for future use.
+#
+# [export]
+# google   = true
+# username = "your-email@gmail.com"
+#
+# [export.oauth2]
+# client_id     = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+# client_secret = "YOUR_CLIENT_SECRET"
+# refresh_token = ""   # populated automatically after first sign-in
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Import settings  (used by: imap-eml-export import)
+# ──────────────────────────────────────────────────────────────────────────────
+[import]
+host      = "imap.example.com"
+port      = 993
+username  = "your-email@example.com"
+password  = "your-app-password"
+input_dir = "./output"
+tls       = true
+starttls  = false
+
+# Google/Gmail import example – same as the export section above:
+#
+# [import]
+# google   = true
+# username = "destination@gmail.com"
+#
+# [import.oauth2]
+# client_id     = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+# client_secret = "YOUR_CLIENT_SECRET"

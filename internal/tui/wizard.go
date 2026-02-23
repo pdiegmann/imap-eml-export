@@ -24,9 +24,27 @@ const (
 var (
 	titleStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("62"))
 	promptStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	hintStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("82"))
 )
+
+// stepHints provides a contextual hint shown below each input field.
+var stepHints = []string{
+	// stepHost
+	"Common values: imap.gmail.com · imap.mail.yahoo.com · outlook.office365.com\n" +
+		"  Tip: for Gmail/Google Workspace, quit and re-run with --google instead.",
+	// stepPort
+	"993 = implicit TLS/IMAPS (recommended)  |  143 = plain / STARTTLS",
+	// stepUsername
+	"Usually your full email address, e.g. you@example.com",
+	// stepPassword
+	"Gmail / Google Workspace: create an App Password at\n" +
+		"  myaccount.google.com/apppasswords  (requires 2-Step Verification)",
+	// stepOutputDir
+	"The directory where exported .eml files will be written.\n" +
+		"  It will be created if it does not exist.",
+}
 
 type wizardModel struct {
 	step      wizardStep
@@ -40,7 +58,7 @@ func newWizardModel() wizardModel {
 	inputs := make([]textinput.Model, 5)
 
 	inputs[0] = textinput.New()
-	inputs[0].Placeholder = "imap.gmail.com"
+	inputs[0].Placeholder = "imap.example.com"
 	inputs[0].Focus()
 	inputs[0].CharLimit = 256
 
@@ -140,12 +158,14 @@ func (m *wizardModel) buildConfig() {
 		port = 993
 	}
 	m.cfg = &config.Config{
-		Host:      m.inputs[stepHost].Value(),
-		Port:      port,
-		Username:  m.inputs[stepUsername].Value(),
-		Password:  m.inputs[stepPassword].Value(),
-		OutputDir: m.inputs[stepOutputDir].Value(),
-		TLS:       port == 993,
+		Export: config.ExportConfig{
+			Host:      m.inputs[stepHost].Value(),
+			Port:      port,
+			Username:  m.inputs[stepUsername].Value(),
+			Password:  m.inputs[stepPassword].Value(),
+			OutputDir: m.inputs[stepOutputDir].Value(),
+			TLS:       port == 993,
+		},
 	}
 }
 
@@ -155,11 +175,17 @@ func (m wizardModel) View() string {
 		return successStyle.Render("✓ Configuration complete!") + "\n"
 	}
 
-	view := titleStyle.Render("IMAP EML Export - Setup Wizard") + "\n\n"
+	view := titleStyle.Render("IMAP EML Export - Setup Wizard") + "\n"
+	view += hintStyle.Render("Answer each question and press Enter. Leave blank to accept the default.") + "\n\n"
+
 	for i, label := range labels {
 		if i == int(m.step) {
 			view += promptStyle.Render(fmt.Sprintf("▸ %s: ", label))
 			view += m.inputs[i].View() + "\n"
+			// Show hint for the current step.
+			if i < len(stepHints) {
+				view += hintStyle.Render("  "+stepHints[i]) + "\n"
+			}
 		} else if i < int(m.step) {
 			view += promptStyle.Render(fmt.Sprintf("  %s: ", label))
 			if i == int(stepPassword) {
@@ -170,9 +196,9 @@ func (m wizardModel) View() string {
 		}
 	}
 	if m.err != "" {
-		view += "\n" + errorStyle.Render("Error: "+m.err) + "\n"
+		view += "\n" + errorStyle.Render("✗ "+m.err) + "\n"
 	}
-	view += "\n" + promptStyle.Render("Press Enter to continue, Esc to quit")
+	view += "\n" + promptStyle.Render("Enter = next  |  Esc / Ctrl+C = quit")
 	return view
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/emersion/go-sasl"
 	"github.com/pdiegmann/imap-eml-export/internal/export"
 )
 
@@ -75,6 +76,20 @@ func (c *Client) Connect() error {
 func (c *Client) Authenticate() error {
 	if err := c.c.Login(c.username, c.password).Wait(); err != nil {
 		return fmt.Errorf("login: %w", err)
+	}
+	return nil
+}
+
+// AuthenticateOAuth2 logs in using the OAUTHBEARER SASL mechanism with the
+// provided OAuth2 access token.  This is required for Gmail and Google
+// Workspace (GSuite) accounts when OAuth2 is enabled.
+func (c *Client) AuthenticateOAuth2(accessToken string) error {
+	saslClient := sasl.NewOAuthBearerClient(&sasl.OAuthBearerOptions{
+		Username: c.username,
+		Token:    accessToken,
+	})
+	if err := c.c.Authenticate(saslClient); err != nil {
+		return fmt.Errorf("oauth2 authenticate: %w", err)
 	}
 	return nil
 }
