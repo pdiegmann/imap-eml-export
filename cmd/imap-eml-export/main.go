@@ -199,11 +199,17 @@ func runExport(cmd *cobra.Command, args []string) error {
 		cfg.Export.TLS = true
 	}
 
-	if cfg.Export.Host == "" {
-		cfg, err = tui.RunWizard()
+	// Run the setup wizard when essential config is missing:
+	//   • No provider set yet (host is empty and --google not given), or
+	//   • Google mode selected but username still unknown.
+	needsWizard := (!cfg.Export.Google && cfg.Export.Host == "") ||
+		(cfg.Export.Google && cfg.Export.Username == "")
+	if needsWizard {
+		exportCfg, err := tui.RunExportWizard(cfg.Export.Google)
 		if err != nil {
 			return fmt.Errorf("wizard: %w", err)
 		}
+		cfg.Export = exportCfg.Export
 		if cfgPath, err := config.DefaultConfigPath(); err == nil {
 			_ = cfg.Save(cfgPath)
 		}
@@ -308,6 +314,22 @@ func runImport(cmd *cobra.Command, args []string) error {
 		// Always use the standard IMAPS port for Google.
 		cfg.Import.Port = google.GmailIMAPPort
 		cfg.Import.TLS = true
+	}
+
+	// Run the setup wizard when essential config is missing:
+	//   • No provider set yet (host is empty and --google not given), or
+	//   • Google mode selected but username still unknown.
+	needsWizard := (!cfg.Import.Google && cfg.Import.Host == "") ||
+		(cfg.Import.Google && cfg.Import.Username == "")
+	if needsWizard {
+		importCfg, err := tui.RunImportWizard(cfg.Import.Google)
+		if err != nil {
+			return fmt.Errorf("wizard: %w", err)
+		}
+		cfg.Import = importCfg.Import
+		if cfgPath, err := config.DefaultConfigPath(); err == nil {
+			_ = cfg.Save(cfgPath)
+		}
 	}
 
 	// Determine the input directory.
