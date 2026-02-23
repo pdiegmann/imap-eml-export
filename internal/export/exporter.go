@@ -25,10 +25,10 @@ type Message struct {
 
 // ProgressUpdate carries progress information for display.
 type ProgressUpdate struct {
-	Folder          string
-	Current         int
-	Total           int
-	BytesDownloaded int64
+	Folder           string
+	Current          int
+	Total            int
+	BytesTransferred int64
 }
 
 // ProgressCallback is called with progress updates during export.
@@ -96,10 +96,10 @@ func (e *Exporter) exportFolder(ctx context.Context, client IMAPClient, folder s
 
 		if e.Progress != nil {
 			e.Progress(ProgressUpdate{
-				Folder:          folder,
-				Current:         i + 1,
-				Total:           total,
-				BytesDownloaded: bytesDownloaded,
+				Folder:           folder,
+				Current:          i + 1,
+				Total:            total,
+				BytesTransferred: bytesDownloaded,
 			})
 		}
 	}
