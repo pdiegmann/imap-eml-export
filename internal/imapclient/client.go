@@ -11,6 +11,19 @@ import (
 	"github.com/pdiegmann/imap-eml-export/internal/export"
 )
 
+// isAlreadyExistsErr returns true when the IMAP server rejected CREATE because
+// the mailbox already exists (RFC 9051 §7.1 [ALREADYEXISTS] response code, or
+// servers that send a plain NO with similar wording).
+func isAlreadyExistsErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if imapErr, ok := err.(*imap.Error); ok {
+		return imapErr.Code == imap.ResponseCodeAlreadyExists
+	}
+	return false
+}
+
 // Client wraps the go-imap/v2 client.
 type Client struct {
 	addr     string
@@ -152,6 +165,42 @@ func (c *Client) FetchMessages(folder string) ([]export.Message, error) {
 	}
 
 	return messages, nil
+}
+
+// EnsureMailbox creates the mailbox on the server if it does not already exist.
+// It is idempotent: if the mailbox already exists the call succeeds silently.
+func (c *Client) EnsureMailbox(name string) error {
+	err := c.c.Create(name, nil).Wait()
+	if err == nil || isAlreadyExistsErr(err) {
+		return nil
+	}
+	// Some servers do not send [ALREADYEXISTS] but return a generic NO.
+	// Try SELECT to confirm the mailbox is reachable despite the error.
+	if _, selectErr := c.c.Select(name, nil).Wait(); selectErr == nil {
+		return nil
+	}
+	return fmt.Errorf("creating mailbox %q: %w", name, err)
+}
+
+// AppendMessage uploads raw EML bytes to the named mailbox.
+// date is recorded as the IMAP internal date; a zero value lets the server
+// choose.
+func (c *Client) AppendMessage(folder string, date time.Time, raw []byte) error {
+	opts := &imap.AppendOptions{}
+	if !date.IsZero() {
+		opts.Time = date
+	}
+	appendCmd := c.c.Append(folder, int64(len(raw)), opts)
+	if _, err := appendCmd.Write(raw); err != nil {
+		return fmt.Errorf("writing message body: %w", err)
+	}
+	if err := appendCmd.Close(); err != nil {
+		return fmt.Errorf("closing append writer: %w", err)
+	}
+	if _, err := appendCmd.Wait(); err != nil {
+		return fmt.Errorf("append command: %w", err)
+	}
+	return nil
 }
 
 // Close terminates the IMAP connection.

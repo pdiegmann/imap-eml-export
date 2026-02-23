@@ -10,6 +10,7 @@ import (
 	"github.com/pdiegmann/imap-eml-export/internal/config"
 	"github.com/pdiegmann/imap-eml-export/internal/export"
 	"github.com/pdiegmann/imap-eml-export/internal/imapclient"
+	"github.com/pdiegmann/imap-eml-export/internal/importer"
 	"github.com/pdiegmann/imap-eml-export/internal/tui"
 	"github.com/pdiegmann/imap-eml-export/internal/updater"
 	"github.com/spf13/cobra"
@@ -28,6 +29,13 @@ var exportCmd = &cobra.Command{
 	Use:   "export",
 	Short: "Export emails from IMAP server",
 	RunE:  runExport,
+}
+
+var importCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import EML files into an IMAP server",
+	Long:  "Reads exported EML files from a local directory and uploads them to a target IMAP server, preserving the original folder hierarchy.",
+	RunE:  runImport,
 }
 
 var updateCmd = &cobra.Command{
@@ -67,7 +75,16 @@ func init() {
 	viper.BindPFlag("tls", exportCmd.Flags().Lookup("tls"))           //nolint:errcheck
 	viper.BindPFlag("starttls", exportCmd.Flags().Lookup("starttls")) //nolint:errcheck
 
+	importCmd.Flags().String("host", "", "target IMAP host")
+	importCmd.Flags().Int("port", 0, "target IMAP port")
+	importCmd.Flags().StringP("username", "u", "", "target IMAP username")
+	importCmd.Flags().StringP("password", "p", "", "target IMAP password")
+	importCmd.Flags().StringP("input", "i", "", "input directory containing exported EML files")
+	importCmd.Flags().Bool("tls", true, "use TLS for target connection")
+	importCmd.Flags().Bool("starttls", false, "use STARTTLS for target connection")
+
 	rootCmd.AddCommand(exportCmd)
+	rootCmd.AddCommand(importCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(versionCmd)
 }
@@ -144,6 +161,89 @@ func runExport(cmd *cobra.Command, args []string) error {
 	<-progressDone
 
 	return exportErr
+}
+
+func runImport(cmd *cobra.Command, args []string) error {
+	cfgFile, _ := cmd.Root().PersistentFlags().GetString("config")
+	cfg, err := config.Load(cfgFile)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// CLI flag overrides (target IMAP credentials).
+	if host, _ := cmd.Flags().GetString("host"); host != "" {
+		cfg.Host = host
+	}
+	if port, _ := cmd.Flags().GetInt("port"); port != 0 {
+		cfg.Port = port
+	}
+	if username, _ := cmd.Flags().GetString("username"); username != "" {
+		cfg.Username = username
+	}
+	if password, _ := cmd.Flags().GetString("password"); password != "" {
+		cfg.Password = password
+	}
+
+	// Determine the input directory (separate from cfg.OutputDir).
+	inputDir, _ := cmd.Flags().GetString("input")
+	if inputDir == "" {
+		inputDir = cfg.OutputDir // fall back to the config's output_dir as a convenience
+	}
+
+	// Validate required fields for import (no outputDir required).
+	if cfg.Host == "" {
+		return fmt.Errorf("target IMAP host is required (use --host or set host in config)")
+	}
+	if cfg.Port <= 0 || cfg.Port > 65535 {
+		return fmt.Errorf("invalid port: %d", cfg.Port)
+	}
+	if cfg.Username == "" {
+		return fmt.Errorf("target IMAP username is required (use --username or set username in config)")
+	}
+	if cfg.Password == "" {
+		return fmt.Errorf("target IMAP password is required (use --password or set password in config)")
+	}
+	if inputDir == "" {
+		return fmt.Errorf("input directory is required (use --input or set output_dir in config)")
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	updates := make(chan export.ProgressUpdate, 100)
+	progressDone := make(chan error, 1)
+
+	go func() {
+		progressDone <- tui.RunImportProgress(ctx, updates)
+	}()
+
+	tlsFlag, _ := cmd.Flags().GetBool("tls")
+	startTLSFlag, _ := cmd.Flags().GetBool("starttls")
+	client := imapclient.New(cfg.Host, cfg.Port, cfg.Username, cfg.Password, tlsFlag, startTLSFlag)
+
+	if err := client.Connect(); err != nil {
+		close(updates)
+		return fmt.Errorf("connecting to target: %w", err)
+	}
+	defer client.Close()
+
+	if err := client.Authenticate(); err != nil {
+		close(updates)
+		return fmt.Errorf("authenticating with target: %w", err)
+	}
+
+	imp := importer.New(inputDir, func(u export.ProgressUpdate) {
+		select {
+		case updates <- u:
+		default:
+		}
+	})
+
+	importErr := imp.Import(ctx, client)
+	close(updates)
+	<-progressDone
+
+	return importErr
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {

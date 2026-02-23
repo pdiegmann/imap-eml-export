@@ -18,12 +18,18 @@ type progressModel struct {
 	update    export.ProgressUpdate
 	startTime time.Time
 	done      bool
+	verb      string // e.g. "Exporting" or "Importing"
+	noun      string // e.g. "Export" or "Import"
 }
 
 type progressUpdateMsg export.ProgressUpdate
 type doneMsg struct{}
 
 func newProgressModel() progressModel {
+	return newProgressModelLabeled("Exporting", "Export")
+}
+
+func newProgressModelLabeled(verb, noun string) progressModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -34,6 +40,8 @@ func newProgressModel() progressModel {
 		spinner:   s,
 		progress:  p,
 		startTime: time.Now(),
+		verb:      verb,
+		noun:      noun,
 	}
 }
 
@@ -72,7 +80,7 @@ func (m progressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m progressModel) View() string {
 	if m.done {
 		elapsed := time.Since(m.startTime).Round(time.Second)
-		return successStyle.Render(fmt.Sprintf("✓ Export complete in %s!", elapsed)) + "\n"
+		return successStyle.Render(fmt.Sprintf("✓ %s complete in %s!", m.noun, elapsed)) + "\n"
 	}
 
 	elapsed := time.Since(m.startTime).Round(time.Second)
@@ -82,8 +90,9 @@ func (m progressModel) View() string {
 	}
 
 	return fmt.Sprintf(
-		"%s Exporting: %s\n%s\n%d/%d messages | %.1f msg/s | %s elapsed\n",
+		"%s %s: %s\n%s\n%d/%d messages | %.1f msg/s | %s elapsed\n",
 		m.spinner.View(),
+		m.verb,
 		m.update.Folder,
 		m.progress.View(),
 		m.update.Current,
@@ -95,7 +104,16 @@ func (m progressModel) View() string {
 
 // RunProgress displays an export progress dashboard.
 func RunProgress(ctx context.Context, updates <-chan export.ProgressUpdate) error {
-	m := newProgressModel()
+	return runProgressLabeled(ctx, updates, "Exporting", "Export")
+}
+
+// RunImportProgress displays an import progress dashboard.
+func RunImportProgress(ctx context.Context, updates <-chan export.ProgressUpdate) error {
+	return runProgressLabeled(ctx, updates, "Importing", "Import")
+}
+
+func runProgressLabeled(ctx context.Context, updates <-chan export.ProgressUpdate, verb, noun string) error {
+	m := newProgressModelLabeled(verb, noun)
 	p := tea.NewProgram(m)
 
 	go func() {
