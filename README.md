@@ -4,11 +4,17 @@
 [![Release](https://img.shields.io/github/v/release/pdiegmann/imap-eml-export)](https://github.com/pdiegmann/imap-eml-export/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Export all emails from an IMAP server to local `.eml` files, mirroring the server's folder hierarchy — no installation required.
+> Export every email from an IMAP server to local `.eml` files — and optionally import them back into a different server. Perfect for backups, migrations, and archiving. No installation required.
 
-## Why?
+## Features
 
-Standard email clients make it cumbersome to export a full mailbox. `imap-eml-export` is a single executable that connects directly to any IMAP server and downloads every message in every folder, preserving the complete directory structure. It's perfect for backups, migrations, and archiving.
+- **Export** every folder of any IMAP mailbox to `.eml` files, preserving the complete folder hierarchy
+- **Import** those files back into a (different) IMAP server to migrate an entire mailbox
+- **Gmail / Google Workspace** sign-in via OAuth2 — no app-password or special knowledge required
+- Interactive **setup wizard** that guides you on the first run and saves your settings for next time
+- Live **progress dashboard** with folder name, message counter, speed, and elapsed time
+- **Config file** + **environment variables** + **CLI flags** with clear priority ordering
+- **Self-update** — keeps itself up to date with one command
 
 ---
 
@@ -16,113 +22,268 @@ Standard email clients make it cumbersome to export a full mailbox. `imap-eml-ex
 
 **1. Download** the binary for your platform from the [latest release](https://github.com/pdiegmann/imap-eml-export/releases/latest).
 
-**2. Run it** (on macOS/Linux, `chmod +x` first):
+**2. Make it executable** (macOS / Linux):
 
 ```bash
-./imap-eml-export export
+chmod +x imap-eml-export
 ```
 
-A TUI wizard will guide you through the setup on first run, then save your settings for future use.
+**3. Run it:**
 
-**3. Done.** Your emails are in the `./output/` directory, organised by folder.
+```bash
+# Let the interactive wizard guide you
+./imap-eml-export export
+
+# Or supply everything on the command line
+./imap-eml-export export \
+    --export-host imap.example.com \
+    --export-username me@example.com \
+    --export-password secret \
+    --output ./backup
+
+# Gmail / Google Workspace — OAuth2 sign-in, no password needed
+./imap-eml-export export --google --export-username me@gmail.com
+```
+
+**4. Done.** Your emails are in `./output/`, organised by folder.
 
 ---
 
-## Usage
+## Commands
 
-### Subcommands
+```
+imap-eml-export <command> [flags]
+```
 
-| Command | Description |
-|---------|-------------|
-| `export` | Export emails from IMAP (default if no subcommand given) |
-| `update` | Self-update to the latest release |
+| Command   | Description |
+|-----------|-------------|
+| `export`  | Download all emails from an IMAP server to local `.eml` files |
+| `import`  | Upload `.eml` files from a local directory to an IMAP server |
+| `update`  | Self-update to the latest release |
 | `version` | Print the current version |
 
-### CLI Flags
+Run any command with `--help` to see its flags:
 
-**Global flags** (available on all subcommands):
+```bash
+./imap-eml-export --help
+./imap-eml-export export --help
+./imap-eml-export import --help
+```
 
-| Flag | Description |
-|------|-------------|
-| `--config <path>` | Config file path (default: `~/.config/imap-eml-export/config.toml`) |
-| `--log-file <path>` | Write logs to a file |
-| `-v`, `--verbose` | Enable verbose output |
-| `--debug` | Enable debug output |
+---
 
-**`export` flags:**
+## CLI Flags
+
+### Global flags (all commands)
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--host <host>` | IMAP server hostname | |
-| `--port <port>` | IMAP server port | `993` |
-| `-u`, `--username <user>` | IMAP username | |
-| `-p`, `--password <pass>` | IMAP password | |
-| `-o`, `--output <dir>` | Output directory | `./output` |
-| `--tls` | Use implicit TLS | `true` |
-| `--starttls` | Use STARTTLS upgrade | `false` |
-| `-y`, `--yes` | Skip confirmations | `false` |
+| `--config <path>` | Config file path | `~/.config/imap-eml-export/config.toml` |
+| `--log-file <path>` | Write logs to a file | |
+| `-v`, `--verbose` | Verbose output | `false` |
+| `--debug` | Debug output (very verbose) | `false` |
 
-### Environment Variables
+### `export` flags
 
-All settings can be overridden with `IMAP_`-prefixed environment variables:
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--export-host <host>` | IMAP hostname of the source server | |
+| `--export-port <port>` | IMAP port of the source server | `993` |
+| `-u`, `--export-username <user>` | Login username (usually your email address) | |
+| `-p`, `--export-password <pass>` | Login password (use an App Password for Gmail) | |
+| `-o`, `--output <dir>` | Directory where `.eml` files are written | `./output` |
+| `--export-tls` | Use implicit TLS/IMAPS | `true` |
+| `--export-starttls` | Upgrade to TLS via STARTTLS (use with `--export-tls=false`) | `false` |
+| `--google` | Sign in with Google OAuth2 — sets host/port/TLS automatically | `false` |
+| `-y`, `--yes` | Skip confirmation prompts | `false` |
+
+### `import` flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--import-host <host>` | IMAP hostname of the target server | |
+| `--import-port <port>` | IMAP port of the target server | `993` |
+| `-u`, `--import-username <user>` | Login username for the target server | |
+| `-p`, `--import-password <pass>` | Login password for the target server | |
+| `-i`, `--input <dir>` | Directory of `.eml` files to upload | `import.input_dir` or `export.output_dir` from config |
+| `--import-tls` | Use implicit TLS/IMAPS | `true` |
+| `--import-starttls` | Upgrade to TLS via STARTTLS (use with `--import-tls=false`) | `false` |
+| `--google` | Sign in with Google OAuth2 — sets host/port/TLS automatically | `false` |
+
+---
+
+## Gmail / Google Workspace
+
+Standard Gmail and Google Workspace accounts block plain-password IMAP login. Use the `--google` flag (or `google = true` in the config) to authenticate via OAuth2 instead.
+
+### What happens on first run
+
+1. The tool prints a short URL and a code.
+2. Open the URL in any browser and sign in with your Google account.
+3. Enter the code when prompted.
+4. The refresh token is cached locally — subsequent runs are fully automatic.
+
+### Example
 
 ```bash
-export IMAP_HOST=imap.example.com
-export IMAP_PORT=993
-export IMAP_USERNAME=user@example.com
-export IMAP_PASSWORD=secret
-export IMAP_OUTPUT_DIR=./backup
-export IMAP_TLS=true
+# Export from Gmail
+./imap-eml-export export --google --export-username me@gmail.com
+
+# Import into a Google Workspace account
+./imap-eml-export import --google --import-username me@company.com --input ./backup
 ```
 
-### Config File
+### Providing OAuth2 credentials
 
-The config file is TOML. Default location: `~/.config/imap-eml-export/config.toml`.
+The tool needs a Google OAuth2 **Client ID** and **Client Secret**. Supply them via environment variables or in the config file (see below).
 
-See [`config.example.toml`](config.example.toml) for a fully commented example:
+**How to obtain credentials** (one-time setup):
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a project → **APIs & Services** → **Credentials**.
+3. Click **Create credentials** → **OAuth 2.0 Client ID**.
+4. Application type: **Desktop app**.
+5. Copy the **Client ID** and **Client Secret**.
+
+Set them as environment variables:
+
+```bash
+export GOOGLE_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
+export GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET
+```
+
+Or add them to the config file (see [Config File](#config-file) below).
+
+---
+
+## Environment Variables
+
+All settings can be provided via environment variables. The prefix is `IMAP_` followed by the section (`EXPORT` or `IMPORT`) and the key name.
+
+```bash
+# Export source server
+export IMAP_EXPORT_HOST=imap.example.com
+export IMAP_EXPORT_PORT=993
+export IMAP_EXPORT_USERNAME=me@example.com
+export IMAP_EXPORT_PASSWORD=secret
+export IMAP_EXPORT_OUTPUT_DIR=./backup
+export IMAP_EXPORT_TLS=true
+
+# Import target server
+export IMAP_IMPORT_HOST=imap.newserver.com
+export IMAP_IMPORT_PORT=993
+export IMAP_IMPORT_USERNAME=me@newserver.com
+export IMAP_IMPORT_PASSWORD=secret
+export IMAP_IMPORT_INPUT_DIR=./backup
+
+# Google OAuth2 credentials (shared by both export and import)
+export GOOGLE_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
+export GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET
+```
+
+---
+
+## Config File
+
+Default location: `~/.config/imap-eml-export/config.toml`
+
+The config file uses separate `[export]` and `[import]` sections so that both source and target accounts can live in a single file. See [`config.example.toml`](config.example.toml) for a fully annotated template.
+
+**Priority:** CLI flags > environment variables > config file > defaults.
+
+### Standard IMAP server
 
 ```toml
-host       = "imap.gmail.com"
+[export]
+host       = "imap.example.com"
 port       = 993
-username   = "your-email@gmail.com"
-# WARNING: password is stored in plaintext. Restrict file permissions: chmod 600.
-password   = "your-app-password"
+username   = "me@example.com"
+# WARNING: password is stored in plaintext. Restrict permissions: chmod 600 ~/.config/imap-eml-export/config.toml
+password   = "your-password"
 output_dir = "./output"
 tls        = true
 starttls   = false
+
+[import]
+host      = "imap.newserver.com"
+port      = 993
+username  = "me@newserver.com"
+password  = "your-password"
+input_dir = "./output"
+tls       = true
+starttls  = false
 ```
 
-**Priority order:** CLI flags > environment variables > config file > defaults.
+### Gmail / Google Workspace via OAuth2
 
-### Output Structure
+```toml
+[export]
+google   = true
+username = "me@gmail.com"
+
+[export.oauth2]
+client_id     = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+client_secret = "YOUR_CLIENT_SECRET"
+# refresh_token is populated automatically after the first sign-in
+
+[import]
+google   = true
+username = "dest@company.com"
+
+[import.oauth2]
+client_id     = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+client_secret = "YOUR_CLIENT_SECRET"
+```
+
+---
+
+## Output Structure
+
+Exported emails are saved as individual `.eml` files under the output directory, mirroring the IMAP folder hierarchy:
 
 ```
 output/
 ├── INBOX/
 │   ├── 00001_2024-01-15_hello-world.eml
 │   └── 00002_2024-01-16_another-subject.eml
-├── INBOX/Projects/
-│   └── ClientA/
-│       └── 00001_2024-02-01_proposal.eml
 ├── Sent/
+│   └── 00001_2024-01-10_re-proposal.eml
+├── Work/
+│   └── ProjectA/
+│       └── 00001_2024-02-01_proposal.eml
 └── Drafts/
 ```
 
-File names follow the pattern `{sequence}_{date}_{sanitized-subject}.eml`.
+File names follow the pattern `{sequence}_{YYYY-MM-DD}_{sanitized-subject}.eml`.
+
+---
+
+## Releasing a New Version
+
+Use `scripts/release.sh` to bump the version and create a signed git tag:
+
+```bash
+# Bump the patch version (e.g. v0.1.1 → v0.1.2) — this is the default
+./scripts/release.sh
+
+# Bump the minor version (e.g. v0.1.1 → v0.2.0)
+./scripts/release.sh minor
+
+# Bump the major version (e.g. v0.1.1 → v1.0.0)
+./scripts/release.sh major
+```
+
+The script reads the latest `v*.*.*` tag, increments the chosen component (resetting lower ones to zero), asks for confirmation, then creates an annotated tag and pushes it.
 
 ---
 
 ## Self-Update
 
-Check for and apply updates:
-
 ```bash
-# Interactive (asks before downloading)
 ./imap-eml-export update
-
-# Non-interactive
-./imap-eml-export update --yes
 ```
+
+Downloads and replaces the current binary with the latest GitHub release.
 
 ---
 
@@ -133,18 +294,14 @@ Requires Go 1.24+.
 ```bash
 git clone https://github.com/pdiegmann/imap-eml-export.git
 cd imap-eml-export
+
+# Quick build
 go build -o imap-eml-export ./cmd/imap-eml-export
-```
 
-With version embedded:
-
-```bash
+# With version embedded
 go build -ldflags "-X main.version=v1.0.0" -o imap-eml-export ./cmd/imap-eml-export
-```
 
-Build all platforms locally:
-
-```bash
+# Build all platforms locally (uses scripts/build-local.sh)
 bash scripts/build-local.sh v1.0.0
 ```
 
@@ -152,9 +309,7 @@ bash scripts/build-local.sh v1.0.0
 
 ## Local IMAP Test Server
 
-A Docker Compose setup is included to spin up a local Dovecot IMAP server
-pre-loaded with sample emails. This lets you run the exporter end-to-end and
-compare the output against the known input.
+A Docker Compose setup is included to spin up a local Dovecot IMAP server pre-loaded with sample emails. This lets you run the exporter end-to-end and compare the output against the known input.
 
 **Requirements:** Docker with Compose plugin (or `docker-compose` v2).
 
@@ -164,11 +319,9 @@ compare the output against the known input.
 docker compose up -d
 ```
 
-This builds and starts a Dovecot container with:
-
 | Port | Protocol | Notes |
 |------|----------|-------|
-| 143  | plain IMAP | use with `config.test.toml` |
+| 143  | plain IMAP | used by `config.test.toml` |
 | 993  | IMAPS (TLS) | self-signed certificate |
 
 Credentials: `testuser` / `testpassword`
@@ -182,14 +335,13 @@ Pre-loaded folders:
 | `Work` | 1 |
 | `Work/ProjectA` | 1 |
 
-### Run the exporter against it
+### Run against the test server
 
 ```bash
 ./imap-eml-export export --config config.test.toml -y
 ```
 
-Exported files land in `./test-output/`. Compare them with the sample sources
-in `dev/imap/sample-emails/` to verify correctness.
+Exported files land in `./test-output/`. Compare them with the sample sources in `dev/imap/sample-emails/`.
 
 ### Stop the server
 

@@ -21,63 +21,140 @@ var version = "dev"
 
 var rootCmd = &cobra.Command{
 	Use:   "imap-eml-export",
-	Short: "Export IMAP mailboxes to EML files",
-	Long:  "A tool to export all emails from an IMAP server to local EML files, mirroring the folder hierarchy.",
+	Short: "Export and import IMAP mailboxes as EML files",
+	Long: `imap-eml-export connects to any IMAP server and exports every email in every
+folder to local .eml files, preserving the complete folder hierarchy. It can
+also import those files back into a (different) IMAP server — making it ideal
+for backups, migrations, and archiving.
+
+Configuration is read from (in order of priority):
+  1. CLI flags (--export-host, --import-username, …)
+  2. Environment variables (IMAP_EXPORT_HOST, IMAP_IMPORT_USERNAME, …)
+  3. Config file (default: ~/.config/imap-eml-export/config.toml)
+  4. Built-in defaults (port 993, TLS enabled, output ./output)
+
+The config file uses separate [export] and [import] sections so source and
+target accounts can live in one file. See config.example.toml for a fully
+annotated template.
+
+Gmail / Google Workspace users: pass --google (or set google = true in the
+config) to authenticate via OAuth2 — no app-password required.`,
 }
 
 var exportCmd = &cobra.Command{
 	Use:   "export",
-	Short: "Export emails from IMAP server",
-	RunE:  runExport,
+	Short: "Export emails from an IMAP server to local .eml files",
+	Long: `Connect to an IMAP server and download every message in every folder to the
+local file system as individual .eml files.
+
+Folder hierarchy is preserved: an IMAP folder "Work/ProjectA" becomes the
+directory Work/ProjectA/ under the output directory.
+
+File names follow the pattern:
+  {sequence}_{YYYY-MM-DD}_{sanitized-subject}.eml
+  e.g.  00001_2024-01-15_hello-world.eml
+
+If no server credentials are found in the config file or environment, an
+interactive setup wizard starts automatically and saves the config for future
+runs.
+
+Gmail / Google Workspace users: use --google instead of --export-password.
+The first run opens a browser-based sign-in flow; the token is cached locally
+so subsequent runs need no interaction.`,
+	Example: `  # Minimal: let the wizard guide you
+  imap-eml-export export
+
+  # Provide credentials on the command line
+  imap-eml-export export --export-host imap.example.com \
+      --export-username me@example.com --export-password secret \
+      --output ./backup
+
+  # Gmail / Google Workspace via OAuth2
+  imap-eml-export export --google --export-username me@gmail.com
+
+  # Non-TLS / STARTTLS server
+  imap-eml-export export --export-host mail.example.com --export-port 143 \
+      --export-tls=false --export-starttls
+
+  # Use a custom config file
+  imap-eml-export export --config ~/my-config.toml`,
+	RunE: runExport,
 }
 
 var importCmd = &cobra.Command{
 	Use:   "import",
-	Short: "Import EML files into an IMAP server",
-	Long:  "Reads exported EML files from a local directory and uploads them to a target IMAP server, preserving the original folder hierarchy.",
-	RunE:  runImport,
+	Short: "Import .eml files from a local directory into an IMAP server",
+	Long: `Walk a local directory tree of .eml files (as produced by the export command)
+and upload every message to the corresponding IMAP mailbox on the target
+server, recreating the original folder structure.
+
+The input directory defaults to the value of import.input_dir in the config
+file, falling back to export.output_dir. Override it with --input.
+
+Gmail / Google Workspace users: use --google instead of --import-password.`,
+	Example: `  # Import from the default output directory into a new server
+  imap-eml-export import --import-host imap.newserver.com \
+      --import-username me@newserver.com --import-password secret
+
+  # Specify a custom input directory
+  imap-eml-export import --input ./my-backup \
+      --import-host imap.example.com --import-username me@example.com \
+      --import-password secret
+
+  # Import into Gmail / Google Workspace via OAuth2
+  imap-eml-export import --google --import-username dest@gmail.com \
+      --input ./backup`,
+	RunE: runImport,
 }
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update imap-eml-export to the latest version",
-	RunE:  runUpdate,
+	Short: "Update imap-eml-export to the latest release",
+	Long: `Check GitHub for a newer release of imap-eml-export. If one is found, download
+and replace the current binary in-place.
+
+The update is downloaded from the official GitHub release page:
+  https://github.com/pdiegmann/imap-eml-export/releases`,
+	Example: `  imap-eml-export update`,
+	RunE:    runUpdate,
 }
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the version",
+	Short: "Print the current version",
+	Long:  `Print the version string that was embedded at build time.`,
+	Example: `  imap-eml-export version`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("imap-eml-export %s\n", version)
 	},
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("config", "", "config file path")
-	rootCmd.PersistentFlags().String("log-file", "", "log file path")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
-	rootCmd.PersistentFlags().Bool("debug", false, "debug output")
+	rootCmd.PersistentFlags().String("config", "", "config file path (default: ~/.config/imap-eml-export/config.toml)")
+	rootCmd.PersistentFlags().String("log-file", "", "write log output to this file instead of stderr")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "enable verbose/informational output")
+	rootCmd.PersistentFlags().Bool("debug", false, "enable debug output (very verbose)")
 
 	// export command flags – these override the [export] config section.
-	exportCmd.Flags().String("export-host", "", "IMAP host for export")
-	exportCmd.Flags().Int("export-port", 0, "IMAP port for export")
-	exportCmd.Flags().StringP("export-username", "u", "", "IMAP username for export")
-	exportCmd.Flags().StringP("export-password", "p", "", "IMAP password for export")
-	exportCmd.Flags().StringP("output", "o", "", "output directory")
-	exportCmd.Flags().Bool("export-tls", true, "use TLS for export connection")
-	exportCmd.Flags().Bool("export-starttls", false, "use STARTTLS for export connection")
-	exportCmd.Flags().Bool("google", false, "use Google/Gmail OAuth2 for export (sets host/port/TLS automatically)")
-	exportCmd.Flags().BoolP("yes", "y", false, "skip confirmations")
+	exportCmd.Flags().String("export-host", "", "IMAP hostname or IP of the source server (e.g. imap.example.com)")
+	exportCmd.Flags().Int("export-port", 0, "IMAP port of the source server (default: 993 for TLS, 143 for plain/STARTTLS)")
+	exportCmd.Flags().StringP("export-username", "u", "", "login username for the source IMAP server (usually your email address)")
+	exportCmd.Flags().StringP("export-password", "p", "", "login password for the source IMAP server (use an App Password for Gmail)")
+	exportCmd.Flags().StringP("output", "o", "", "directory where exported .eml files are written (default: ./output)")
+	exportCmd.Flags().Bool("export-tls", true, "use implicit TLS (IMAPS) for the source connection — recommended")
+	exportCmd.Flags().Bool("export-starttls", false, "upgrade a plain connection to TLS via STARTTLS (use with --export-tls=false)")
+	exportCmd.Flags().Bool("google", false, "sign in with Google OAuth2 instead of a password — works with Gmail and Google Workspace; sets host/port/TLS automatically")
+	exportCmd.Flags().BoolP("yes", "y", false, "skip all confirmation prompts")
 
 	// import command flags – these override the [import] config section.
-	importCmd.Flags().String("import-host", "", "target IMAP host for import")
-	importCmd.Flags().Int("import-port", 0, "target IMAP port for import")
-	importCmd.Flags().StringP("import-username", "u", "", "target IMAP username for import")
-	importCmd.Flags().StringP("import-password", "p", "", "target IMAP password for import")
-	importCmd.Flags().StringP("input", "i", "", "input directory containing exported EML files")
-	importCmd.Flags().Bool("import-tls", true, "use TLS for import connection")
-	importCmd.Flags().Bool("import-starttls", false, "use STARTTLS for import connection")
-	importCmd.Flags().Bool("google", false, "use Google/Gmail OAuth2 for import (sets host/port/TLS automatically)")
+	importCmd.Flags().String("import-host", "", "IMAP hostname or IP of the target server (e.g. imap.example.com)")
+	importCmd.Flags().Int("import-port", 0, "IMAP port of the target server (default: 993 for TLS, 143 for plain/STARTTLS)")
+	importCmd.Flags().StringP("import-username", "u", "", "login username for the target IMAP server (usually your email address)")
+	importCmd.Flags().StringP("import-password", "p", "", "login password for the target IMAP server (use an App Password for Gmail)")
+	importCmd.Flags().StringP("input", "i", "", "directory containing exported .eml files to upload (default: import.input_dir or export.output_dir from config)")
+	importCmd.Flags().Bool("import-tls", true, "use implicit TLS (IMAPS) for the target connection — recommended")
+	importCmd.Flags().Bool("import-starttls", false, "upgrade a plain connection to TLS via STARTTLS (use with --import-tls=false)")
+	importCmd.Flags().Bool("google", false, "sign in with Google OAuth2 instead of a password — works with Gmail and Google Workspace; sets host/port/TLS automatically")
 
 	rootCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(importCmd)
