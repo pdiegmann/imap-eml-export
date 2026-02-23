@@ -140,12 +140,14 @@ func (m *wizardModel) buildConfig() {
 		port = 993
 	}
 	m.cfg = &config.Config{
-		Host:      m.inputs[stepHost].Value(),
-		Port:      port,
-		Username:  m.inputs[stepUsername].Value(),
-		Password:  m.inputs[stepPassword].Value(),
-		OutputDir: m.inputs[stepOutputDir].Value(),
-		TLS:       port == 993,
+		Export: config.ExportConfig{
+			Host:      m.inputs[stepHost].Value(),
+			Port:      port,
+			Username:  m.inputs[stepUsername].Value(),
+			Password:  m.inputs[stepPassword].Value(),
+			OutputDir: m.inputs[stepOutputDir].Value(),
+			TLS:       port == 993,
+		},
 	}
 }
 

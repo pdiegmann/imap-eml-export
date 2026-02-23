@@ -5,21 +5,57 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/viper"
 )
 
+// GoogleOAuth2Config holds Google OAuth2 credentials used for IMAP OAUTHBEARER
+// authentication. ClientID and ClientSecret are optional when provided via
+// environment variables GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.
+type GoogleOAuth2Config struct {
+	ClientID     string `mapstructure:"client_id"     toml:"client_id,omitempty"`
+	ClientSecret string `mapstructure:"client_secret" toml:"client_secret,omitempty"`
+	// RefreshToken is stored here after the first successful OAuth2 flow.
+	RefreshToken string `mapstructure:"refresh_token" toml:"refresh_token,omitempty"`
+}
+
+// ExportConfig holds configuration for the export command.
+type ExportConfig struct {
+	Host      string             `mapstructure:"host"       toml:"host,omitempty"`
+	Port      int                `mapstructure:"port"       toml:"port,omitempty"`
+	Username  string             `mapstructure:"username"   toml:"username,omitempty"`
+	Password  string             `mapstructure:"password"   toml:"password,omitempty"`
+	OutputDir string             `mapstructure:"output_dir" toml:"output_dir,omitempty"`
+	TLS       bool               `mapstructure:"tls"        toml:"tls"`
+	StartTLS  bool               `mapstructure:"starttls"   toml:"starttls,omitempty"`
+	// Google, when true, automatically sets Host/Port/TLS for Gmail/GSuite and
+	// uses OAuth2 OAUTHBEARER authentication instead of plain password login.
+	Google bool               `mapstructure:"google"     toml:"google,omitempty"`
+	OAuth2 GoogleOAuth2Config `mapstructure:"oauth2"     toml:"oauth2,omitempty"`
+}
+
+// ImportConfig holds configuration for the import command.
+type ImportConfig struct {
+	Host     string             `mapstructure:"host"      toml:"host,omitempty"`
+	Port     int                `mapstructure:"port"      toml:"port,omitempty"`
+	Username string             `mapstructure:"username"  toml:"username,omitempty"`
+	Password string             `mapstructure:"password"  toml:"password,omitempty"`
+	InputDir string             `mapstructure:"input_dir" toml:"input_dir,omitempty"`
+	TLS      bool               `mapstructure:"tls"       toml:"tls"`
+	StartTLS bool               `mapstructure:"starttls"  toml:"starttls,omitempty"`
+	// Google, when true, automatically sets Host/Port/TLS for Gmail/GSuite and
+	// uses OAuth2 OAUTHBEARER authentication instead of plain password login.
+	Google bool               `mapstructure:"google"    toml:"google,omitempty"`
+	OAuth2 GoogleOAuth2Config `mapstructure:"oauth2"    toml:"oauth2,omitempty"`
+}
+
 // Config holds all application settings.
 type Config struct {
-	Host       string `mapstructure:"host"        toml:"host"`
-	Port       int    `mapstructure:"port"        toml:"port"`
-	Username   string `mapstructure:"username"    toml:"username"`
-	Password   string `mapstructure:"password"    toml:"password"`
-	OutputDir  string `mapstructure:"output_dir"  toml:"output_dir"`
-	TLS        bool   `mapstructure:"tls"         toml:"tls"`
-	StartTLS   bool   `mapstructure:"starttls"    toml:"starttls"`
-	ConfigFile string `mapstructure:"-"           toml:"-"`
+	Export     ExportConfig `mapstructure:"export" toml:"export"`
+	Import     ImportConfig `mapstructure:"import" toml:"import"`
+	ConfigFile string       `mapstructure:"-"      toml:"-"`
 }
 
 // DefaultConfigPath returns the default config file path.
@@ -32,25 +68,40 @@ func DefaultConfigPath() (string, error) {
 }
 
 // Load reads configuration from file, env vars, and applies overrides.
-// Priority: CLI flags > env vars > config file > defaults
+// Priority: CLI flags > env vars > config file > defaults.
+//
+// Environment variables use the prefix IMAP_ followed by the section and key,
+// e.g. IMAP_EXPORT_HOST, IMAP_EXPORT_PORT, IMAP_IMPORT_HOST, etc.
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 
-	// Defaults
-	v.SetDefault("port", 993)
-	v.SetDefault("output_dir", "./output")
-	v.SetDefault("tls", true)
-	v.SetDefault("starttls", false)
+	// Defaults for export.
+	v.SetDefault("export.port", 993)
+	v.SetDefault("export.output_dir", "./output")
+	v.SetDefault("export.tls", true)
+	v.SetDefault("export.starttls", false)
 
-	// Env vars
+	// Defaults for import.
+	v.SetDefault("import.port", 993)
+	v.SetDefault("import.tls", true)
+	v.SetDefault("import.starttls", false)
+
+	// Env vars: IMAP_EXPORT_HOST → export.host, IMAP_IMPORT_HOST → import.host, …
 	v.SetEnvPrefix("IMAP")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-	// Explicitly bind env vars so Unmarshal picks them up in all viper versions.
-	for _, key := range []string{"host", "port", "username", "password", "output_dir", "tls", "starttls"} {
-		_ = v.BindEnv(key) // BindEnv only fails on empty key, which cannot happen here
+	for _, key := range []string{
+		"export.host", "export.port", "export.username", "export.password",
+		"export.output_dir", "export.tls", "export.starttls", "export.google",
+		"export.oauth2.client_id", "export.oauth2.client_secret", "export.oauth2.refresh_token",
+		"import.host", "import.port", "import.username", "import.password",
+		"import.input_dir", "import.tls", "import.starttls", "import.google",
+		"import.oauth2.client_id", "import.oauth2.client_secret", "import.oauth2.refresh_token",
+	} {
+		_ = v.BindEnv(key)
 	}
 
-	// Config file
+	// Config file.
 	if configPath != "" {
 		v.SetConfigFile(configPath)
 	} else {
@@ -92,22 +143,52 @@ func (c *Config) Save(path string) error {
 	return enc.Encode(c)
 }
 
-// Validate checks that all required fields are set.
-func (c *Config) Validate() error {
-	if c.Host == "" {
-		return errors.New("host is required")
+// ValidateExport checks that all required fields for the export command are set.
+func (c *Config) ValidateExport() error {
+	ex := &c.Export
+	if !ex.Google {
+		if ex.Host == "" {
+			return errors.New("export.host is required")
+		}
 	}
-	if c.Port <= 0 || c.Port > 65535 {
-		return fmt.Errorf("invalid port: %d", c.Port)
+	if ex.Port <= 0 || ex.Port > 65535 {
+		return fmt.Errorf("invalid export.port: %d", ex.Port)
 	}
-	if c.Username == "" {
-		return errors.New("username is required")
+	if ex.Username == "" {
+		return errors.New("export.username is required")
 	}
-	if c.Password == "" {
-		return errors.New("password is required")
+	if !ex.Google && ex.Password == "" {
+		return errors.New("export.password is required (or set export.google = true for OAuth2)")
 	}
-	if c.OutputDir == "" {
-		return errors.New("output_dir is required")
+	if ex.OutputDir == "" {
+		return errors.New("export.output_dir is required")
 	}
 	return nil
+}
+
+// ValidateImport checks that all required fields for the import command are set.
+func (c *Config) ValidateImport() error {
+	im := &c.Import
+	if !im.Google {
+		if im.Host == "" {
+			return errors.New("import.host is required")
+		}
+	}
+	if im.Port <= 0 || im.Port > 65535 {
+		return fmt.Errorf("invalid import.port: %d", im.Port)
+	}
+	if im.Username == "" {
+		return errors.New("import.username is required")
+	}
+	if !im.Google && im.Password == "" {
+		return errors.New("import.password is required (or set import.google = true for OAuth2)")
+	}
+	return nil
+}
+
+// Validate is kept for backward compatibility and validates only the export config.
+// Deprecated: Use ValidateExport or ValidateImport instead.
+// Note: this only validates the export configuration, not import configuration.
+func (c *Config) Validate() error {
+	return c.ValidateExport()
 }

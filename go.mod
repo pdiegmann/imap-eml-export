@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	code.gitea.io/sdk/gitea v0.18.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect

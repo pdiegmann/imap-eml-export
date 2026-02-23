@@ -10,6 +10,7 @@
 #
 # Compare the exported .eml files in test-output/ against dev/imap/sample-emails/.
 
+[export]
 host       = "localhost"
 port       = 143
 username   = "testuser"
@@ -17,3 +18,12 @@ password   = "testpassword"
 output_dir = "./test-output"
 tls        = false
 starttls   = false
+
+[import]
+host      = "localhost"
+port      = 143
+username  = "testuser"
+password  = "testpassword"
+input_dir = "./test-output"
+tls       = false
+starttls  = false
